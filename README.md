@@ -76,16 +76,17 @@ The parser extracts YAML frontmatter and markdown body, validates schema complia
 | Route | Purpose |
 |-------|---------|
 | `/` | Skill directory with search and tag filtering |
-| `/skill/[id]` | Skill detail with validation report and body preview |
+| `/skill/[id]` | Skill detail with validation report, body preview, and linked file editor |
 | `/build` | Guided skill builder with live preview and save-to-disk |
+| `/analytics` | Usage insights parsed from sessions, logs, and dashboard activity |
 
 ## Roadmap
 
 - [x] Linked file editing (references/, templates/, scripts/, assets/)
 - [x] Dark mode toggle
 - [x] Sorting and advanced filtering
+- [x] Skill usage analytics
 - [ ] GitHub PR submission flow for community skill sharing
-- [ ] Skill usage analytics
 
 ## Contributing
 

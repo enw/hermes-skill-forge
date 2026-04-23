@@ -42,6 +42,9 @@ export default function RootLayout({
               <Link href="/build" className="text-muted-foreground hover:text-foreground transition-colors">
                 Builder
               </Link>
+              <Link href="/analytics" className="text-muted-foreground hover:text-foreground transition-colors">
+                Analytics
+              </Link>
               <ThemeToggle />
             </nav>
           </header>

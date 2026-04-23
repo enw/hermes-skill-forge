@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
 import { LinkedFilesEditor } from "@/components/linked-files-editor";
+import { trackSkillView } from "@/app/skill/[id]/actions";
 
 export default async function SkillPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,6 +15,9 @@ export default async function SkillPage({ params }: { params: Promise<{ id: stri
 
   const issues = validateSkill(skill);
   const skillDir = skill.sourcePath ? skill.sourcePath.replace(/\/SKILL\.md$/, "") : "";
+
+  // Fire-and-forget usage tracking
+  trackSkillView(skill.id, skill.frontmatter.name || skill.id);
 
   return (
     <div className="space-y-6 max-w-3xl">

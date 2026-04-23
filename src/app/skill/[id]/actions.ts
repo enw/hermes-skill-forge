@@ -2,12 +2,12 @@
 
 import fs from "fs/promises";
 import path from "path";
+import { recordForgeEvent } from "@/lib/usage-analytics";
 
 const SKILLS_DIR = process.env.SKILLS_DIR || path.join(process.env.HOME || "~", ".hermes", "skills");
 
 export async function readLinkedFile(skillDirPath: string, filePath: string): Promise<{ success: boolean; content?: string; message?: string }> {
   try {
-    // Security: ensure the resolved path stays within the skill directory
     const fullPath = path.resolve(path.join(skillDirPath, filePath));
     const resolvedSkillDir = path.resolve(skillDirPath);
     if (!fullPath.startsWith(resolvedSkillDir + path.sep) && fullPath !== resolvedSkillDir) {
@@ -50,4 +50,8 @@ export async function deleteLinkedFile(skillDirPath: string, filePath: string): 
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, message: `Delete failed: ${msg}` };
   }
+}
+
+export async function trackSkillView(skillId: string, skillName: string): Promise<void> {
+  await recordForgeEvent(skillId, skillName, "view");
 }
