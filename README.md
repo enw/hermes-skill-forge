@@ -81,7 +81,7 @@ The parser extracts YAML frontmatter and markdown body, validates schema complia
 
 ## Roadmap
 
-- [ ] Linked file editing (references/, templates/, scripts/)
+- [x] Linked file editing (references/, templates/, scripts/, assets/)
 - [ ] Dark mode toggle
 - [ ] GitHub PR submission flow for community skill sharing
 - [ ] Sorting and advanced filtering

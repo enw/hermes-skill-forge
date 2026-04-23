@@ -1,18 +1,19 @@
-import { loadAllSkills } from "@/lib/skills-loader";
+import { getSkillById } from "@/lib/skills-loader";
 import { validateSkill } from "@/lib/skill-parser";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
+import { LinkedFilesEditor } from "@/components/linked-files-editor";
 
 export default async function SkillPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const skills = await loadAllSkills();
-  const skill = skills.find((s) => s.id === id);
+  const skill = await getSkillById(id);
   if (!skill) notFound();
 
   const issues = validateSkill(skill);
+  const skillDir = skill.sourcePath ? skill.sourcePath.replace(/\/SKILL\.md$/, "") : "";
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -120,6 +121,13 @@ export default async function SkillPage({ params }: { params: Promise<{ id: stri
             )}
           </div>
         </div>
+      )}
+
+      {skillDir && (
+        <>
+          <Separator />
+          <LinkedFilesEditor skillDirPath={skillDir} linkedFiles={skill.linkedFiles} />
+        </>
       )}
     </div>
   );

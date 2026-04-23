@@ -1,9 +1,43 @@
 import fs from "fs/promises";
 import path from "path";
 import { parseSkill } from "./skill-parser";
-import { ParsedSkill } from "./skill-schema";
+import { ParsedSkill, LinkedFile } from "./skill-schema";
 
 const SKILLS_DIR = process.env.SKILLS_DIR || path.join(process.env.HOME || "~", ".hermes", "skills");
+
+const LINKED_DIRS = ["references", "templates", "scripts", "assets"];
+
+async function loadLinkedFiles(skillDir: string): Promise<LinkedFile[]> {
+  const files: LinkedFile[] = [];
+  for (const sub of LINKED_DIRS) {
+    const subDir = path.join(skillDir, sub);
+    try {
+      const entries = await fs.readdir(subDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile()) {
+          const filePath = path.join(subDir, entry.name);
+          const content = await fs.readFile(filePath, "utf-8");
+          files.push({ path: `${sub}/${entry.name}`, content });
+        }
+      }
+    } catch {
+      // directory may not exist
+    }
+  }
+  return files;
+}
+
+async function loadSkillAt(skillPath: string): Promise<ParsedSkill | null> {
+  try {
+    const content = await fs.readFile(skillPath, "utf-8");
+    const skill = parseSkill(content, skillPath);
+    const skillDir = path.dirname(skillPath);
+    skill.linkedFiles = await loadLinkedFiles(skillDir);
+    return skill;
+  } catch {
+    return null;
+  }
+}
 
 export async function loadAllSkills(): Promise<ParsedSkill[]> {
   const skills: ParsedSkill[] = [];
@@ -14,23 +48,19 @@ export async function loadAllSkills(): Promise<ParsedSkill[]> {
 
     for (const dir of dirs) {
       const skillPath = path.join(SKILLS_DIR, dir.name, "SKILL.md");
-      try {
-        const content = await fs.readFile(skillPath, "utf-8");
-        const skill = parseSkill(content, skillPath);
+      const skill = await loadSkillAt(skillPath);
+      if (skill) {
         skills.push(skill);
-      } catch {
-        // Some dirs may not have SKILL.md at top level — try one level deeper
-        const subEntries = await fs.readdir(path.join(SKILLS_DIR, dir.name), { withFileTypes: true });
-        const subDirs = subEntries.filter((e) => e.isDirectory());
-        for (const sub of subDirs) {
-          const subSkillPath = path.join(SKILLS_DIR, dir.name, sub.name, "SKILL.md");
-          try {
-            const content = await fs.readFile(subSkillPath, "utf-8");
-            const skill = parseSkill(content, subSkillPath);
-            skills.push(skill);
-          } catch {
-            // ignore
-          }
+        continue;
+      }
+      // Try one level deeper
+      const subEntries = await fs.readdir(path.join(SKILLS_DIR, dir.name), { withFileTypes: true });
+      const subDirs = subEntries.filter((e) => e.isDirectory());
+      for (const sub of subDirs) {
+        const subSkillPath = path.join(SKILLS_DIR, dir.name, sub.name, "SKILL.md");
+        const subSkill = await loadSkillAt(subSkillPath);
+        if (subSkill) {
+          skills.push(subSkill);
         }
       }
     }
@@ -39,6 +69,11 @@ export async function loadAllSkills(): Promise<ParsedSkill[]> {
   }
 
   return skills;
+}
+
+export async function getSkillById(id: string): Promise<ParsedSkill | null> {
+  const skills = await loadAllSkills();
+  return skills.find((s) => s.id === id) || null;
 }
 
 export async function getSkillTags(skills: ParsedSkill[]): Promise<string[]> {
