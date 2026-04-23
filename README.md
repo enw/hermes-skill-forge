@@ -83,8 +83,8 @@ The parser extracts YAML frontmatter and markdown body, validates schema complia
 
 - [x] Linked file editing (references/, templates/, scripts/, assets/)
 - [x] Dark mode toggle
+- [x] Sorting and advanced filtering
 - [ ] GitHub PR submission flow for community skill sharing
-- [ ] Sorting and advanced filtering
 - [ ] Skill usage analytics
 
 ## Contributing

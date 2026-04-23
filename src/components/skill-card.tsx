@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ParsedSkill } from "@/lib/skill-schema";
-import { FileText, AlertCircle } from "lucide-react";
+import { FileText, AlertCircle, FolderOpen } from "lucide-react";
 
 export function SkillCard({ skill }: { skill: ParsedSkill }) {
   const tags = [
@@ -14,12 +14,14 @@ export function SkillCard({ skill }: { skill: ParsedSkill }) {
 
   const issues = skill.frontmatter.name && skill.frontmatter.description ? 0 : 1;
 
+  const category = (skill.sourcePath?.replace(/.*\.hermes\/skills\//, "").split("/")[0] || "");
+
   return (
     <Link href={`/skill/${encodeURIComponent(skill.id)}`} className="block group">
       <Card className="h-full transition-colors hover:border-foreground/20">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
               <h3 className="font-medium text-sm leading-tight line-clamp-1">
                 {skill.frontmatter.name || "Unnamed Skill"}
@@ -43,8 +45,16 @@ export function SkillCard({ skill }: { skill: ParsedSkill }) {
               ))}
             </div>
           )}
-          <div className="text-[10px] text-muted-foreground/60 font-mono truncate">
-            {skill.sourcePath?.replace(/.*\.hermes\/skills\//, "") || skill.id}
+          <div className="flex items-center justify-between gap-2">
+            {category && (
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
+                <FolderOpen className="h-3 w-3" />
+                <span className="truncate max-w-[120px]">{category}</span>
+              </div>
+            )}
+            <div className="text-[10px] text-muted-foreground/60 font-mono truncate ml-auto">
+              {skill.linkedFiles.length > 0 && `${skill.linkedFiles.length} file${skill.linkedFiles.length > 1 ? "s" : ""}`}
+            </div>
           </div>
         </CardContent>
       </Card>
