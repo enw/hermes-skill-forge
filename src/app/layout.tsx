@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PushToTalk } from "@/components/push-to-talk";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -52,6 +53,7 @@ export default function RootLayout({
             </nav>
           </header>
           <main className="max-w-6xl mx-auto px-6 py-8">{children}</main>
+          <PushToTalk />
         </ThemeProvider>
       </body>
     </html>
