@@ -3,16 +3,34 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
-function useSpeechRecognition() {
+function useSpeechRecognition({ onFinal }: { onFinal?: (transcript: string) => void } = {}) {
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef('');
+  const lastInterimRef = useRef('');
+  const firedRef = useRef(false);
+  const onFinalRef = useRef(onFinal);
+
+  useEffect(() => {
+    onFinalRef.current = onFinal;
+  });
 
   const isSupported =
     typeof window !== 'undefined' &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  const fireCallback = () => {
+    if (firedRef.current) return;
+    const text = finalTranscriptRef.current.trim() || lastInterimRef.current.trim();
+    if (text) {
+      firedRef.current = true;
+      onFinalRef.current?.(text);
+    }
+  };
 
   const stopRecording = () => {
     if (recognitionRef.current) {
@@ -28,12 +46,14 @@ function useSpeechRecognition() {
     if (!isSupported) return;
 
     finalTranscriptRef.current = '';
+    lastInterimRef.current = '';
+    firedRef.current = false;
     setInterimText('');
     setIsRecording(true);
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition!;
     const recognition = new SR();
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
@@ -51,6 +71,9 @@ function useSpeechRecognition() {
       if (final) {
         finalTranscriptRef.current += final;
       }
+      if (interim) {
+        lastInterimRef.current = interim;
+      }
       setInterimText(interim);
     };
 
@@ -62,13 +85,14 @@ function useSpeechRecognition() {
     recognition.onend = () => {
       setIsRecording(false);
       setInterimText('');
+      fireCallback();
+      finalTranscriptRef.current = '';
+      lastInterimRef.current = '';
     };
 
     recognition.start();
     recognitionRef.current = recognition;
   };
-
-  const getTranscript = () => finalTranscriptRef.current.trim();
 
   return {
     isSupported,
@@ -76,74 +100,92 @@ function useSpeechRecognition() {
     interimText,
     startRecording,
     stopRecording,
-    getTranscript,
   };
 }
 
-interface InputWithMicProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+interface InputWithMicProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  containerClassName?: string;
+}
 
-export function InputWithMic({ className, ...props }: InputWithMicProps) {
+export function InputWithMic({
+  className,
+  containerClassName,
+  onChange,
+  value,
+  ...props
+}: InputWithMicProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const {
     isSupported,
     isRecording,
     interimText,
     startRecording,
     stopRecording,
-    getTranscript,
-  } = useSpeechRecognition();
+  } = useSpeechRecognition({
+    onFinal: (transcript) => {
+      if (!onChange) return;
+      const currentValue = String(value ?? inputRef.current?.value ?? '');
+      const { start, end } = selectionRef.current;
+      const newValue = currentValue.slice(0, start) + transcript + ' ' + currentValue.slice(end);
+      // Build a minimal event that satisfies e.target.value
+      onChange({ target: { value: newValue } } as React.ChangeEvent<HTMLInputElement>);
+      const newCursor = start + transcript.length + 1;
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.selectionStart = newCursor;
+          inputRef.current.selectionEnd = newCursor;
+          inputRef.current.focus();
+        }
+      });
+    },
+  });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
+    // Snapshot cursor position before recording blurs the input
+    selectionRef.current = {
+      start: inputRef.current?.selectionStart ?? (inputRef.current?.value.length ?? 0),
+      end: inputRef.current?.selectionEnd ?? (inputRef.current?.value.length ?? 0),
+    };
     startRecording();
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
     e.preventDefault();
     stopRecording();
-    const transcript = getTranscript();
-    if (transcript && inputRef.current) {
-      const start = inputRef.current.selectionStart ?? 0;
-      const end = inputRef.current.selectionEnd ?? 0;
-      const newValue =
-        inputRef.current.value.slice(0, start) +
-        transcript +
-        ' ' +
-        inputRef.current.value.slice(end);
-
-      // Native setter for React controlled input
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        'value'
-      )?.set;
-      if (nativeSetter) {
-        nativeSetter.call(inputRef.current, newValue);
-      }
-
-      inputRef.current.selectionStart = inputRef.current.selectionEnd =
-        start + transcript.length + 1;
-
-      // Dispatch React input event
-      inputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-      inputRef.current.focus();
-    }
   };
 
-  const handlePointerLeave = (e: React.PointerEvent) => {
+  const handlePointerLeave = () => {
     if (isRecording) {
       stopRecording();
     }
   };
 
+  if (!mounted) {
+    return (
+      <Input className={className} onChange={onChange} value={value} ref={inputRef} {...props} />
+    );
+  }
+
   if (!isSupported) {
-    return <input className={className} ref={inputRef} {...props} />;
+    return (
+      <Input className={className} onChange={onChange} value={value} ref={inputRef} {...props} />
+    );
   }
 
   return (
-    <div className="relative">
-      <input
+    <div className={cn('relative w-full', containerClassName)}>
+      <Input
         className={cn(className, isRecording && 'pr-10')}
         ref={inputRef}
+        onChange={onChange}
+        value={value}
         {...props}
       />
       <button
@@ -171,68 +213,99 @@ export function InputWithMic({ className, ...props }: InputWithMicProps) {
   );
 }
 
-interface TextareaWithMicProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+interface TextareaWithMicProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  containerClassName?: string;
+}
 
-export function TextareaWithMic({ className, ...props }: TextareaWithMicProps) {
+export function TextareaWithMic({
+  className,
+  containerClassName,
+  onChange,
+  value,
+  ...props
+}: TextareaWithMicProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const selectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const {
     isSupported,
     isRecording,
     interimText,
     startRecording,
     stopRecording,
-    getTranscript,
-  } = useSpeechRecognition();
+  } = useSpeechRecognition({
+    onFinal: (transcript) => {
+      if (!onChange) return;
+      const currentValue = String(value ?? textareaRef.current?.value ?? '');
+      const { start, end } = selectionRef.current;
+      const newValue = currentValue.slice(0, start) + transcript + ' ' + currentValue.slice(end);
+      onChange({ target: { value: newValue } } as React.ChangeEvent<HTMLTextAreaElement>);
+      const newCursor = start + transcript.length + 1;
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = newCursor;
+          textareaRef.current.selectionEnd = newCursor;
+          textareaRef.current.focus();
+        }
+      });
+    },
+  });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
+    selectionRef.current = {
+      start: textareaRef.current?.selectionStart ?? (textareaRef.current?.value.length ?? 0),
+      end: textareaRef.current?.selectionEnd ?? (textareaRef.current?.value.length ?? 0),
+    };
     startRecording();
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
     e.preventDefault();
     stopRecording();
-    const transcript = getTranscript();
-    if (transcript && textareaRef.current) {
-      const start = textareaRef.current.selectionStart ?? 0;
-      const end = textareaRef.current.selectionEnd ?? 0;
-      const newValue =
-        textareaRef.current.value.slice(0, start) +
-        transcript +
-        ' ' +
-        textareaRef.current.value.slice(end);
-
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        HTMLTextAreaElement.prototype,
-        'value'
-      )?.set;
-      if (nativeSetter) {
-        nativeSetter.call(textareaRef.current, newValue);
-      }
-
-      textareaRef.current.selectionStart = textareaRef.current.selectionEnd =
-        start + transcript.length + 1;
-
-      textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-      textareaRef.current.focus();
-    }
   };
 
-  const handlePointerLeave = (e: React.PointerEvent) => {
+  const handlePointerLeave = () => {
     if (isRecording) {
       stopRecording();
     }
   };
 
+  if (!mounted) {
+    return (
+      <Textarea
+        className={className}
+        onChange={onChange}
+        value={value}
+        ref={textareaRef}
+        {...props}
+      />
+    );
+  }
+
   if (!isSupported) {
-    return <textarea className={className} ref={textareaRef} {...props} />;
+    return (
+      <Textarea
+        className={className}
+        onChange={onChange}
+        value={value}
+        ref={textareaRef}
+        {...props}
+      />
+    );
   }
 
   return (
-    <div className="relative">
-      <textarea
+    <div className={cn('relative w-full', containerClassName)}>
+      <Textarea
         className={cn(className, isRecording && 'pr-10')}
         ref={textareaRef}
+        onChange={onChange}
+        value={value}
         {...props}
       />
       <button

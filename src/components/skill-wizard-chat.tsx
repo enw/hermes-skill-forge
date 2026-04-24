@@ -86,7 +86,7 @@ export function SkillWizardChat({ onReady }: { onReady: (messages: Message[]) =>
           onChange={(e) => setInput(e.target.value)}
           placeholder="Reply..."
           disabled={isLoading}
-          className="flex-1"
+          containerClassName="flex-1"
         />
         <Button type="submit" size="icon" disabled={isLoading}>
           <Send className="h-4 w-4" />

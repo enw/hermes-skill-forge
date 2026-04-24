@@ -1,6 +1,20 @@
 import matter from "gray-matter";
 import { SkillFrontmatter, ParsedSkill, LinkedFile, ValidationIssue, REQUIRED_FIELDS } from "./skill-schema";
 
+/** Stable unique id: relative path under .hermes/skills/ when available, else name slug. */
+function computeSkillId(fm: Partial<SkillFrontmatter>, sourcePath?: string): string {
+  const normalized = sourcePath?.replace(/\\/g, "/");
+  if (normalized && /\.hermes\/skills\//i.test(normalized)) {
+    const rel = normalized
+      .replace(/.*\.hermes\/skills\//i, "")
+      .replace(/\/SKILL\.md$/i, "");
+    if (rel.length > 0 && !rel.startsWith("/") && !rel.includes("..")) {
+      return rel;
+    }
+  }
+  return fm.name?.toLowerCase().replace(/\s+/g, "-") || "unnamed";
+}
+
 export function parseSkill(content: string, sourcePath?: string): ParsedSkill {
   const parsed = matter(content);
   const fm = parsed.data as Partial<SkillFrontmatter>;
@@ -11,7 +25,7 @@ export function parseSkill(content: string, sourcePath?: string): ParsedSkill {
   if (typeof rawFm.platforms === "string") (fm as Record<string, unknown>).platforms = rawFm.platforms.split(/,\s*/).filter(Boolean);
 
   return {
-    id: fm.name?.toLowerCase().replace(/\s+/g, "-") || "unnamed",
+    id: computeSkillId(fm, sourcePath),
     frontmatter: fm as SkillFrontmatter,
     body: parsed.content,
     linkedFiles: [],
