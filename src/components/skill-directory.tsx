@@ -59,9 +59,9 @@ export function SkillDirectory({
     let result = initialSkills.filter((s) => {
       const matchesQuery =
         !q ||
-        s.frontmatter.name.toLowerCase().includes(q) ||
-        s.frontmatter.description.toLowerCase().includes(q) ||
-        s.body.toLowerCase().includes(q);
+        (s.frontmatter.name ?? "").toLowerCase().includes(q) ||
+        (s.frontmatter.description ?? "").toLowerCase().includes(q) ||
+        (s.body ?? "").toLowerCase().includes(q);
 
       const matchesTags =
         selectedTags.length === 0 ||
