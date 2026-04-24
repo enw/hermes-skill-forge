@@ -88,6 +88,13 @@ The parser extracts YAML frontmatter and markdown body, validates schema complia
 - [x] Dark mode toggle
 - [x] Sorting and advanced filtering
 - [x] Skill usage analytics
+- [x] LLM-powered Skill Forge Wizard — conversational interview + generation
+- [ ] Git diff / version history per skill (leverage git log)
+- [ ] Import skill from GitHub URL or raw markdown
+- [ ] Skill dependency graph — visualize cross-references and shared tools
+- [ ] Auto-fix panel — one-click repairs for validation issues
+- [ ] Template library — start from boilerplates (CLI wrapper, API integration, Obsidian workflow)
+- [ ] Dry-run test harness — simulate how Hermes loads and executes a skill
 - [ ] GitHub PR submission flow for community skill sharing
 
 ## Contributing
