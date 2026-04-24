@@ -27,16 +27,20 @@ Output rules:
 - name: kebab-case, concise, unique
 - category: choose a fitting category (e.g., devops, productivity, software-development, research, note-taking, data-science, mlops)
 - skillMd: complete SKILL.md content with YAML frontmatter (name, category, description) and a rich markdown body. Include sections: Overview, When to Use, Prerequisites, Steps, Examples, Pitfalls. Use imperative tone for steps.
-- linkedFiles: optional array of helper files (scripts, templates, references). Path must be relative like "references/example.md" or "scripts/validate.py". Only include if genuinely useful.`;
+- linkedFiles: always include this field. Use an empty array if no helper files are needed; otherwise an array of { path, content } where path is relative like "references/example.md" or "scripts/validate.py". Only add entries when genuinely useful.`;
 
 const skillSchema = z.object({
   name: z.string().describe('Kebab-case skill name'),
   category: z.string().describe('Skill category'),
   skillMd: z.string().describe('Full SKILL.md content including YAML frontmatter'),
-  linkedFiles: z.array(z.object({
-    path: z.string().describe('Relative path like references/example.md'),
-    content: z.string(),
-  })).optional(),
+  linkedFiles: z
+    .array(
+      z.object({
+        path: z.string().describe('Relative path like references/example.md'),
+        content: z.string(),
+      })
+    )
+    .describe('Helper files; use [] when none'),
 });
 
 function checkApiKey() {
