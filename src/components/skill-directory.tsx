@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
+import { InputWithMic } from "@/components/input-with-mic";
 import { Badge } from "@/components/ui/badge";
 import { SkillCard } from "./skill-card";
 import { ParsedSkill } from "@/lib/skill-schema";
@@ -173,7 +174,7 @@ export function SkillDirectory({
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
+          <InputWithMic
             placeholder="Search skills..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}

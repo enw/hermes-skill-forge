@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { interview } from '@/app/forge/actions';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { InputWithMic } from '@/components/input-with-mic';
 import { Send, Wand2 } from 'lucide-react';
 
 export type Message = { role: 'user' | 'assistant'; content: string };
@@ -81,7 +81,7 @@ export function SkillWizardChat({ onReady }: { onReady: (messages: Message[]) =>
       </div>
 
       <form onSubmit={handleSubmit} className="flex gap-2 pt-4 border-t mt-4">
-        <Input
+        <InputWithMic
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Reply..."
