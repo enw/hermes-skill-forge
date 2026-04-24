@@ -2,6 +2,8 @@
 
 A local-first web studio for browsing, authoring, and validating [Hermes Agent](https://github.com/NousResearch/hermes-agent) skills. No cloud. No database. Just your filesystem, rendered beautifully.
 
+![Skill Forge Directory](docs/screenshot.png)
+
 ---
 
 ## The Problem
