@@ -15,11 +15,28 @@ function insertTextAtCursor(text: string): boolean {
   if (tag === 'INPUT' || tag === 'TEXTAREA') {
     const start = el.selectionStart ?? 0;
     const end = el.selectionEnd ?? 0;
-    const value = el.value;
-    el.value = value.slice(0, start) + text + value.slice(end);
+    const newValue = el.value.slice(0, start) + text + el.value.slice(end);
+    
+    // Use the native property setter which React intercepts for controlled inputs
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      tag === 'INPUT' ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype,
+      'value'
+    )?.set;
+    
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(el, newValue);
+    } else {
+      el.value = newValue;
+    }
+    
     el.selectionStart = el.selectionEnd = start + text.length;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    // Dispatch React-compatible input event
+    const event = new Event('input', { bubbles: true });
+    Object.defineProperty(event, 'target', { value: el, writable: false });
+    Object.defineProperty(event, 'currentTarget', { value: el, writable: false });
+    el.dispatchEvent(event);
+    
     el.focus();
     return true;
   }
