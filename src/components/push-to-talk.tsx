@@ -36,8 +36,14 @@ export function PushToTalk() {
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
   const [showNoFocus, setShowNoFocus] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef('');
+
+  // Wait until after hydration to render anything that depends on browser APIs
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isSupported =
     typeof window !== 'undefined' &&
@@ -145,7 +151,7 @@ export function PushToTalk() {
     return () => window.removeEventListener('blur', handleBlur);
   }, [isRecording, stopRecording]);
 
-  if (!isSupported) return null;
+  if (!mounted || !isSupported) return null;
 
   return (
     <>
