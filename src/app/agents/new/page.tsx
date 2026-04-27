@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { interviewAgent, generateAgent, saveAgent } from '@/app/agents/new/actions';
 import type { BDIAgent } from '@/lib/agent-state';
 import { useRouter } from 'next/navigation';
+import MarkdownMessage from '@/components/markdown-message';
 
 export default function NewAgentPage() {
   const router = useRouter();
@@ -172,10 +173,14 @@ export default function NewAgentPage() {
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
                   m.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'bg-primary text-primary-foreground prose-sm'
                     : 'bg-muted'
                 }`}>
-                  {m.content}
+                  {m.role === 'user' ? (
+                    <div>{m.content}</div>
+                  ) : (
+                    <MarkdownMessage content={m.content} role={m.role} />
+                  )}
                 </div>
               </div>
             ))}
