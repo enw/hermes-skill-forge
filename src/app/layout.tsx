@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hermes Skill Forge",
-  description: "Browse, author, and validate Hermes skills",
+  title: "Hermes Forge",
+  description: "Browse, author, and validate Hermes skills and agents",
 };
 
 export default function RootLayout({
@@ -33,17 +33,20 @@ export default function RootLayout({
         <ThemeProvider>
           <header className="border-b px-6 py-3 flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur z-10">
             <Link href="/" className="font-semibold text-lg tracking-tight hover:opacity-80">
-              Hermes Skill Forge
+              Hermes Forge
             </Link>
             <nav className="flex items-center gap-4 text-sm">
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
-                Directory
+                Skills
               </Link>
               <Link href="/build" className="text-muted-foreground hover:text-foreground transition-colors">
-                Builder
+                Skill Builder
               </Link>
               <Link href="/forge" className="text-muted-foreground hover:text-foreground transition-colors">
-                Forge
+                Skill Wizard
+              </Link>
+              <Link href="/agents" className="text-muted-foreground hover:text-foreground transition-colors">
+                Agents
               </Link>
               <Link href="/analytics" className="text-muted-foreground hover:text-foreground transition-colors">
                 Analytics
