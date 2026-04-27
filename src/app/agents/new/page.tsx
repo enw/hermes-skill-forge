@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { interviewAgent, generateAgent, saveAgent } from '@/app/agents/new/actions';
-import type { AgentState } from '@/lib/agent-state';
+import type { BDIAgent } from '@/lib/agent-state';
 import { useRouter } from 'next/navigation';
 
 export default function NewAgentPage() {
@@ -11,12 +11,13 @@ export default function NewAgentPage() {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
-      content: "What would you like this autonomous agent to do? Describe the corpus it should manage, what quality means to you, and what actions it should take."
+      content: "What autonomous agent do you want to create? Describe its domain, what goals it should achieve, any constraints on its behavior, and how often it should run."
     }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [agentSpec, setAgentSpec] = useState<AgentState | null>(null);
+  const [agentSpec, setAgentSpec] = useState<Omit<BDIAgent, 'name'> | null>(null);
+  const [agentName, setAgentName] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
 
   const send = async () => {
@@ -37,6 +38,10 @@ export default function NewAgentPage() {
     setLoading(true);
     const spec = await generateAgent(messages);
     setAgentSpec(spec);
+    // Extract name from the messages or let user set it
+    const generatedName = messages.find(m => m.role === 'user')?.content
+      ?.match(/agent[:\s]+([a-z0-9-]+)/i)?.[1] || 'new-agent';
+    setAgentName(generatedName);
     setPhase('preview');
     setLoading(false);
   };
@@ -45,11 +50,11 @@ export default function NewAgentPage() {
     if (!agentSpec) return;
     setPhase('saving');
     setSaveMessage('Creating agent...');
-    const result = await saveAgent(agentSpec.name, agentSpec);
+    const result = await saveAgent(agentName, agentSpec);
     setSaveMessage(`Saved to ${result.path}`);
     
     setTimeout(() => {
-      router.push(`/agents/${agentSpec.name}`);
+      router.push(`/agents/${agentName}`);
     }, 1500);
   };
 
@@ -67,17 +72,17 @@ export default function NewAgentPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Preview: {agentSpec.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Preview: {agentName}</h1>
           <div className="flex gap-2">
             <button
               onClick={() => setPhase('chat')}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4"
             >
               Back to Chat
             </button>
             <button
               onClick={save}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4"
             >
               Save Agent
             </button>
@@ -86,44 +91,63 @@ export default function NewAgentPage() {
 
         <div className="grid gap-6 md:grid-cols-2">
           <div className="rounded-lg border bg-card p-6 space-y-4">
-            <h2 className="text-lg font-semibold">Configuration</h2>
-            <div>
-              <span className="text-sm font-medium">Type:</span> {agentSpec.type}
+            <h2 className="text-lg font-semibold">BDI Structure</h2>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-blue-400">Desires</h3>
+              <ul className="text-sm space-y-1">
+                {agentSpec.desires.goals.map((g, i) => (
+                  <li key={i} className="text-muted-foreground">🎯 {g}</li>
+                ))}
+              </ul>
+              {agentSpec.desires.priority && (
+                <div className="text-xs text-muted-foreground">Priority: {agentSpec.desires.priority}</div>
+              )}
             </div>
-            <div>
-              <span className="text-sm font-medium">Corpus:</span>{' '}
-              <code className="bg-muted px-1 py-0.5 rounded text-sm">{agentSpec.corpus.path}</code>
-              <span className="text-sm text-muted-foreground ml-2">({agentSpec.corpus.type})</span>
-            </div>
-            <div>
-              <span className="text-sm font-medium">Stopping:</span> {agentSpec.stopping.condition}
-              <br />
-              <span className="text-sm text-muted-foreground">
-                Max {agentSpec.stopping.max_iterations} iterations, {agentSpec.stopping.max_duration} total
-              </span>
-            </div>
-            <div>
-              <span className="text-sm font-medium">Allowed actions:</span>
-              <ul className="text-sm mt-1 space-y-1">
-                {agentSpec.actions.allowed.map((a, i) => (
-                  <li key={i} className="text-green-600">✓ {a}</li>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-amber-400">Intentions</h3>
+              <ul className="text-sm space-y-1">
+                {agentSpec.intentions.constraints.map((c, i) => (
+                  <li key={i} className="text-muted-foreground">📋 {c}</li>
                 ))}
               </ul>
             </div>
-            <div>
-              <span className="text-sm font-medium">Quality metrics:</span>
-              <ul className="text-sm mt-1 space-y-1">
-                {agentSpec.quality.metrics.map((m, i) => (
-                  <li key={i}>• {m}</li>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-emerald-400">Beliefs Schema</h3>
+              <ul className="text-sm space-y-1">
+                {agentSpec.beliefs.schema.map((s, i) => (
+                  <li key={i} className="text-muted-foreground">📊 {s}</li>
                 ))}
               </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Heartbeat</h3>
+              <div className="text-sm text-muted-foreground">
+                Schedule: {agentSpec.heartbeat.schedule}
+                {agentSpec.heartbeat.model && ` · Model: ${agentSpec.heartbeat.model}`}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Tools</h3>
+              <div className="text-xs text-muted-foreground">
+                Allowed: {agentSpec.tools.allowed.join(', ')}
+              </div>
+              {agentSpec.tools.forbidden.length > 0 && (
+                <div className="text-xs text-red-400">
+                  Forbidden: {agentSpec.tools.forbidden.join(', ')}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-lg font-semibold mb-3">Agent State (raw)</h2>
+            <h2 className="text-lg font-semibold mb-3">Agent Spec (raw)</h2>
             <pre className="bg-muted p-4 rounded-md text-xs overflow-auto max-h-96">
-              {JSON.stringify(agentSpec, null, 2)}
+              {JSON.stringify({ name: agentName, ...agentSpec }, null, 2)}
             </pre>
           </div>
         </div>
@@ -137,7 +161,7 @@ export default function NewAgentPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Forge a New Agent</h1>
         <p className="text-muted-foreground">
-          Describe what you want your autonomous agent to do. The wizard will build a complete AGENT.md for you.
+          Describe the autonomous agent you want. The AI will interview you, then generate a BDI-structured AGENT.md.
         </p>
       </div>
 
@@ -167,22 +191,22 @@ export default function NewAgentPage() {
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+              onKeyDown={e => e.key === 'Enter' && send()}
               placeholder="Describe your agent..."
-              className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={loading}
             />
             <button
               onClick={send}
               disabled={!input.trim() || loading}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 disabled:opacity-50"
             >
               Send
             </button>
             <button
               onClick={forge}
               disabled={messages.length <= 1 || loading}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-green-600 hover:bg-green-700 text-white h-10 px-4"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-green-600 hover:bg-green-700 text-white h-10 px-4 disabled:opacity-50"
             >
               Forge Agent
             </button>

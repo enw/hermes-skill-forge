@@ -1,40 +1,70 @@
 "use client";
 
 import { useState } from 'react';
-import { executeAgent } from '@/app/agents/actions';
+
+type CronAction = 'deploy' | 'run' | 'stop' | 'reset';
 
 export function RunAgentButton({ agentName }: { agentName: string }) {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ message: string; actions: string[]; success: boolean } | null>(null);
+  const [activeAction, setActiveAction] = useState<CronAction | null>(null);
+  const [result, setResult] = useState<{ message: string; success: boolean } | null>(null);
 
-  const run = async () => {
+  const runAction = async (action: CronAction) => {
     setLoading(true);
+    setActiveAction(action);
     setResult(null);
-    const r = await executeAgent(agentName);
-    setResult({ message: r.message, actions: r.actions, success: r.success });
-    setLoading(false);
+    try {
+      const res = await fetch('/api/agents/cron', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentName, action }),
+      });
+      const data = await res.json();
+      setResult({ message: data.message, success: data.success });
+      // Refresh page to show updated state
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      setResult({ message: `Error: ${String(err)}`, success: false });
+    } finally {
+      setLoading(false);
+      setActiveAction(null);
+    }
+  };
+
+  const btnClass = (variant: 'primary' | 'success' | 'danger' | 'warning') => {
+    const base = 'inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 disabled:opacity-50 transition-colors';
+    switch (variant) {
+      case 'primary':
+        return `${base} bg-primary text-primary-foreground hover:bg-primary/90`;
+      case 'success':
+        return `${base} bg-green-600 text-white hover:bg-green-700`;
+      case 'danger':
+        return `${base} bg-red-600 text-white hover:bg-red-700`;
+      case 'warning':
+        return `${base} bg-amber-600 text-white hover:bg-amber-700`;
+    }
   };
 
   return (
     <div className="space-y-3">
-      <button
-        onClick={run}
-        disabled={loading}
-        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-      >
-        {loading ? 'Running...' : 'Run Now'}
-      </button>
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => runAction('deploy')} disabled={loading} className={btnClass('success')}>
+          {loading && activeAction === 'deploy' ? 'Deploying...' : 'Deploy'}
+        </button>
+        <button onClick={() => runAction('run')} disabled={loading} className={btnClass('primary')}>
+          {loading && activeAction === 'run' ? 'Running...' : 'Run Now'}
+        </button>
+        <button onClick={() => runAction('stop')} disabled={loading} className={btnClass('danger')}>
+          {loading && activeAction === 'stop' ? 'Stopping...' : 'Stop'}
+        </button>
+        <button onClick={() => runAction('reset')} disabled={loading} className={btnClass('warning')}>
+          {loading && activeAction === 'reset' ? 'Resetting...' : 'Reset State'}
+        </button>
+      </div>
 
       {result && (
-        <div className={`rounded-md border p-4 ${result.success ? 'border-green-600/30 bg-green-500/5' : 'border-red-600/30 bg-red-500/5'}`}>
-          <p className="text-sm font-medium mb-2">{result.message}</p>
-          {result.actions.length > 0 && (
-            <ul className="text-sm space-y-1 mt-2">
-              {result.actions.map((a, i) => (
-                <li key={i} className="font-mono">{a}</li>
-              ))}
-            </ul>
-          )}
+        <div className={`rounded-md border p-3 text-sm ${result.success ? 'border-green-600/30 bg-green-500/5' : 'border-red-600/30 bg-red-500/5'}`}>
+          {result.message}
         </div>
       )}
     </div>

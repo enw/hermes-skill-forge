@@ -1,197 +1,188 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { homedir } from 'os';
-import * as matter from 'gray-matter';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const matter = require('gray-matter');
+import { z } from 'zod';
 
-// AGENT.md schema types
-export interface Soul {
-  persona: string;
-  voice: string;
-  communication: string;
-}
+// ─── BDI Agent Schema (AGENT.md frontmatter) ───────────────────────
 
-export interface CorpusConvention {
-  rule: string;
-  check?: string;
-}
+export const BDIDesiresSchema = z.object({
+  goals: z.array(z.string()).min(1),
+  priority: z.string().optional(),
+  successCriteria: z.string().optional(),
+});
 
-export interface Corpus {
-  path: string;
-  type: string;
-  conventions: string[];
-}
+export const BDIIntentionsSchema = z.object({
+  constraints: z.array(z.string()),
+  planningStrategy: z.string().optional(),
+});
 
-export interface Action {
-  allowed: string[];
-  forbidden: string[];
-}
+export const BDIBeliefsSchema = z.object({
+  schema: z.array(z.string()),
+  statePath: z.string(),
+});
 
-export interface Quality {
-  // YAML parses "broken_link_count: 0" into { broken_link_count: 0 },
-  // but in the agent schema spec we also accept string forms.
-  metrics: Array<string | Record<string, unknown>>;
-}
+export const BDIAgentFullSchema = z.object({
+  name: z.string().min(1),
+  type: z.string(),
+  soul: z.object({
+    persona: z.string().min(1),
+    voice: z.string().min(1),
+  }),
+  desires: BDIDesiresSchema.optional(),
+  intentions: BDIIntentionsSchema.optional(),
+  beliefs: BDIBeliefsSchema.optional(),
+  tools: z.object({
+    allowed: z.array(z.string()),
+    forbidden: z.array(z.string()),
+  }).optional(),
+  heartbeat: z.object({
+    schedule: z.string(),
+    model: z.string().optional(),
+    profile: z.string().optional(),
+  }).optional(),
+});
 
-export interface Stopping {
-  condition: string;
-  max_iterations: number;
-  max_duration: string;
-  checkpoint_every: number;
-}
+export type BDIAgent = z.infer<typeof BDIAgentFullSchema>;
 
-export interface EscalationRule {
-  condition: string;
-  action: string;
-  review_queue?: string;
-}
+// ─── Persisted BDI State (updated each cron tick) ──────────────────
 
-export interface Escalation {
-  rules: EscalationRule[];
-}
+export const BDIStateSchema = z.object({
+  beliefs: z.object({
+    worldState: z.record(z.unknown()),
+    lastObserved: z.string(),
+    observations: z.array(z.string()),
+  }),
+  intentions: z.object({
+    activePlan: z.string(),
+    nextActions: z.array(z.string()),
+    progress: z.string(),
+  }),
+  tickCount: z.number(),
+  goalsMet: z.boolean(),
+  lastTickResult: z.string().optional(),
+  lastCronRunId: z.string().optional(),
+});
 
-export interface Checkpoint {
-  path: string;
-  contains: string[];
-}
+export type BDIState = z.infer<typeof BDIStateSchema>;
 
-export interface AgentState {
+// ─── Agent listing (lightweight) ───────────────────────────────────
+
+export interface AgentInfo {
   name: string;
   type: string;
-  soul: Soul;
-  corpus: Corpus;
-  actions: Action;
-  quality: Quality;
-  stopping: Stopping;
-  escalation: Escalation;
-  checkpoint: Checkpoint;
+  status: string;
+  lastTick?: string;
 }
 
-export interface AgentCheckpoint {
-  agentName: string;
-  iteration: number;
-  corpusSnapshotHash: string;
-  pendingActions: string[];
-  startedAt: string;
-  lastCheckpoint: string;
-  qualityMetrics: Record<string, any>;
-  status: 'running' | 'completed' | 'failed' | 'paused';
-  result?: string;
-}
+// ─── Core functions ─────────────────────────────────────────────────
 
-export function parseAgentMd(content: string): AgentState {
-  const parsed = matter(content);
-  return parsed.data as unknown as AgentState;
-}
-
-export async function loadAgent(agentName: string): Promise<AgentState | null> {
+export async function loadAgent(agentName: string): Promise<BDIAgent | null> {
   const agentPath = path.join(homedir(), '.hermes', 'agents', agentName, 'AGENT.md');
   try {
     const content = await fs.readFile(agentPath, 'utf-8');
-    return parseAgentMd(content);
+    const parsed = matter(content);
+    const result = BDIAgentFullSchema.safeParse(parsed.data);
+    if (!result.success) {
+      console.error(`Invalid AGENT.md for ${agentName}:`, result.error);
+      return null;
+    }
+    return result.data;
   } catch {
     return null;
   }
 }
 
-export async function loadAgentCheckpoint(agentName: string): Promise<AgentCheckpoint | null> {
-  const agentDir = path.join(homedir(), '.hermes', 'agents', agentName);
+export async function loadBDIState(agentName: string): Promise<BDIState | null> {
   const agent = await loadAgent(agentName);
-  if (!agent) return null;
+  if (!agent || !agent.beliefs) return null;
 
-  const checkpointPath = agent.checkpoint?.path 
-    ? agent.checkpoint.path.replace('~', homedir())
-    : path.join(agentDir, 'checkpoint.json');
-
+  const statePath = agent.beliefs.statePath.replace('~', homedir());
   try {
-    const content = await fs.readFile(checkpointPath, 'utf-8');
-    return JSON.parse(content) as AgentCheckpoint;
+    const content = await fs.readFile(statePath, 'utf-8');
+    return JSON.parse(content) as BDIState;
   } catch {
     return null;
   }
 }
 
-export async function saveAgentCheckpoint(
-  agentName: string,
-  checkpoint: AgentCheckpoint
-): Promise<void> {
-  const agentDir = path.join(homedir(), '.hermes', 'agents', agentName);
+export async function saveBDIState(agentName: string, state: BDIState): Promise<void> {
+  const agent = await loadAgent(agentName);
+  if (!agent || !agent.beliefs) throw new Error(`Agent ${agentName} not found or missing beliefs config`);
+
+  const statePath = agent.beliefs.statePath.replace('~', homedir());
+  await fs.mkdir(path.dirname(statePath), { recursive: true });
+  await fs.writeFile(statePath, JSON.stringify(state, null, 2), 'utf-8');
+}
+
+export async function initializeBDIState(agentName: string): Promise<string> {
   const agent = await loadAgent(agentName);
   if (!agent) throw new Error(`Agent ${agentName} not found`);
 
-  const checkpointPath = agent.checkpoint?.path 
-    ? agent.checkpoint.path.replace('~', homedir())
-    : path.join(agentDir, 'checkpoint.json');
-
-  await fs.mkdir(path.dirname(checkpointPath), { recursive: true });
-  await fs.writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2), 'utf-8');
-}
-
-export async function createAgentScaffold(
-  agentName: string,
-  agentState: AgentState
-): Promise<string> {
-  const agentDir = path.join(homedir(), '.hermes', 'agents', agentName);
-  const agentMdPath = path.join(agentDir, 'AGENT.md');
-
-  // Create directories
-  await fs.mkdir(agentDir, { recursive: true });
-  
-  const checkpointDir = agentState.checkpoint?.path
-    ? path.dirname(agentState.checkpoint.path.replace('~', homedir()))
-    : path.join(agentDir, 'checkpoint');
-  await fs.mkdir(checkpointDir, { recursive: true });
-
-  const logDir = path.join(agentDir, 'logs');
-  await fs.mkdir(logDir, { recursive: true });
-
-  // Generate AGENT.md
-  const yamlHeader = matter.stringify('', agentState);
-  const agentMdContent = `---\n${yamlHeader.split('---\n')[1]}---\n\n# ${agentName}\n\nAutonomous corpus steward agent.\n`;
-
-  await fs.writeFile(agentMdPath, agentMdContent, 'utf-8');
-
-  // Create initial checkpoint
-  const initialCheckpoint: AgentCheckpoint = {
-    agentName,
-    iteration: 0,
-    corpusSnapshotHash: '',
-    pendingActions: [],
-    startedAt: new Date().toISOString(),
-    lastCheckpoint: new Date().toISOString(),
-    qualityMetrics: {},
-    status: 'running',
+  const statePath = agent.beliefs.statePath.replace('~', homedir());
+  const initialState: BDIState = {
+    beliefs: {
+      worldState: {},
+      lastObserved: new Date().toISOString(),
+      observations: [],
+    },
+    intentions: {
+      activePlan: '',
+      nextActions: [],
+      progress: '',
+    },
+    tickCount: 0,
+    goalsMet: false,
   };
 
-  await saveAgentCheckpoint(agentName, initialCheckpoint);
-
-  return agentDir;
+  await fs.mkdir(path.dirname(statePath), { recursive: true });
+  await fs.writeFile(statePath, JSON.stringify(initialState, null, 2), 'utf-8');
+  return statePath;
 }
 
-export async function listAgents(): Promise<Array<{ name: string; status: string; lastRun?: string }>> {
+export async function listAgents(): Promise<AgentInfo[]> {
   const agentsDir = path.join(homedir(), '.hermes', 'agents');
-  const results: Array<{ name: string; status: string; lastRun?: string }> = [];
+  const results: AgentInfo[] = [];
 
   try {
     const entries = await fs.readdir(agentsDir, { withFileTypes: true });
     for (const entry of entries.filter(e => e.isDirectory())) {
-      const checkpointPath = path.join(agentsDir, entry.name, 'checkpoint.json');
-      let status = 'unknown';
-      let lastRun: string | undefined;
+      const agent = await loadAgent(entry.name);
+      const state = await loadBDIState(entry.name);
 
-      try {
-        const cp = await fs.readFile(checkpointPath, 'utf-8');
-        const data = JSON.parse(cp) as AgentCheckpoint;
-        status = data.status;
-        lastRun = data.lastCheckpoint;
-      } catch {
-        // No checkpoint yet
-      }
+      if (!agent) continue;
 
-      results.push({ name: entry.name, status, lastRun });
+      results.push({
+        name: entry.name,
+        type: agent.type,
+        status: state?.goalsMet ? 'completed' : state ? 'active' : 'not_started',
+        lastTick: state?.beliefs.lastObserved,
+      });
     }
   } catch {
     // Agents directory doesn't exist yet
   }
 
   return results;
+}
+
+export async function createAgentScaffold(
+  agentName: string,
+  agentState: Omit<BDIAgent, 'name'>
+): Promise<string> {
+  const agentDir = path.join(homedir(), '.hermes', 'agents', agentName);
+  const agentMdPath = path.join(agentDir, 'AGENT.md');
+
+  await fs.mkdir(agentDir, { recursive: true });
+
+  const yamlHeader = matter.stringify('', { name: agentName, ...agentState });
+  const agentMdContent = `---\n${yamlHeader.split('---\n')[1]}---\n\n# ${agentName}\n\nBDI Agent.\n`;
+
+  await fs.writeFile(agentMdPath, agentMdContent, 'utf-8');
+
+  // Initialize BDI state
+  await initializeBDIState(agentName);
+
+  return agentDir;
 }

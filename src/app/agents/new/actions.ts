@@ -3,29 +3,25 @@
 import { openai } from '@ai-sdk/openai';
 import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
-import { createAgentScaffold, AgentState } from '@/lib/agent-state';
+import { createAgentScaffold, BDIAgent } from '@/lib/agent-state';
 
-const agentSchema = z.object({
+const bdiAgentSchema = z.object({
   name: z.string().describe('Kebab-case agent name, e.g., vault-gardener'),
-  type: z.string().describe('Agent type: corpus-steward, watcher, researcher'),
-  soulPersona: z.string().describe('The agent\'s persona in a short phrase'),
-  soulVoice: z.string().describe('How the agent communicates'),
-  soulCommunication: z.string().describe('Communication/output format preference'),
-  corpusPath: z.string().describe('Path to the corpus, e.g., ~/Documents/Areas/vault'),
-  corpusType: z.string().describe('Corpus type: obsidian, skills, codebase'),
-  corpusConventions: z.array(z.string()).describe('List of conventions the agent should enforce'),
-  actionsAllowed: z.array(z.string()).describe('Actions the agent is allowed to take'),
-  actionsForbidden: z.array(z.string()).describe('Actions the agent must NOT take'),
-  qualityMetrics: z.array(z.string()).describe('Quality metrics with thresholds, e.g., broken_link_count: 0'),
-  stoppingCondition: z.string().describe('Natural language stopping condition'),
-  maxIterations: z.number().int().positive(),
-  maxDuration: z.string().describe('Duration like 30m, 1h'),
-  checkpointEvery: z.number().int().positive(),
-  escalationRules: z.array(z.object({
-    condition: z.string(),
-    action: z.string(),
-    reviewQueue: z.string().optional(),
-  })),
+  type: z.string().describe('Agent type, e.g., corpus-steward, watcher, researcher'),
+  personality: z.string().describe("The agent's persona — a short descriptive phrase"),
+  voice: z.string().describe('How the agent communicates — e.g., quiet, systematic, no-nonsense'),
+  goals: z.array(z.string()).describe('Concrete goals with measurable targets, e.g., "broken_link_count must be 0"'),
+  priority: z.string().optional().describe('Overall priority or guiding principle'),
+  successCriteria: z.string().optional().describe('When the agent should consider itself done'),
+  constraints: z.array(z.string()).describe('Behavioral constraints — what the agent must respect while acting'),
+  planningStrategy: z.string().optional().describe('How the agent should prioritize its work'),
+  beliefSchema: z.array(z.string()).describe('State fields to track, e.g., "total_notes: number", "broken_links: number"'),
+  statePath: z.string().describe('Path to persist BDI state, e.g., ~/.cache/hermes/agents/vault-gardener/bdi-state.json'),
+  toolsAllowed: z.array(z.string()).describe('Tool names the agent may use: terminal, file, search_files, read_file, write_file, patch, web_search, web_extract'),
+  toolsForbidden: z.array(z.string()).describe('Tool names the agent must NOT use: clarify, delegate_task'),
+  schedule: z.string().describe('Cron schedule, e.g., "every 6h", "0 9 * * *"'),
+  model: z.string().optional().describe('Model to use, e.g., "anthropic/claude-sonnet-4"'),
+  profile: z.string().optional().describe('Hermes profile to run under, e.g., "default", "work", "research"'),
 });
 
 function checkApiKey() {
@@ -38,16 +34,16 @@ export async function interviewAgent(messages: Array<{role: 'user'|'assistant', 
   checkApiKey();
   const { text } = await generateText({
     model: openai('gpt-4o-mini'),
-    system: `You are Hermes Agent Forge, an expert autonomous-agent design assistant. You help users create "corpus steward" agents that scan a knowledge corpus (Obsidian vault, skill directory, codebase), assess quality, fix issues, and run until a quality threshold is met.
+    system: `You are Hermes Agent Forge, an expert BDI (Belief-Desire-Intention) agent design assistant. You help users create autonomous agents that run on a periodic heartbeat inside Hermes.
 
 Ask focused questions to understand:
-1. What corpus they want to manage (path, type)
-2. What quality means for them (metrics, thresholds)
-3. What actions the agent should take (and what it should NEVER do)
-4. When the agent should stop (stopping conditions)
-5. What should trigger escalation to human review
+1. What domain the agent operates in (what it observes/scans)
+2. What its goals are — concrete, measurable targets (desires)
+3. What constraints it must follow — what it must not do
+4. What tools it needs to accomplish its work
+5. How often it should run (heartbeat schedule)
 
-Keep questions short and specific. Build toward a complete AGENT.md spec.`,
+Keep questions short and specific. Build toward a complete BDI agent spec with beliefs schema, desires, intentions constraints, allowed tools, and heartbeat.`,
     messages,
   });
   return text;
@@ -57,59 +53,59 @@ export async function generateAgent(messages: Array<{role: 'user'|'assistant', c
   checkApiKey();
   const { object } = await generateObject({
     model: openai('gpt-4o'),
-    system: `You are an AGENT.md generator. Based on the conversation, produce a complete agent specification following the Corpus Steward pattern.
+    system: `You are an AGENT.md generator for BDI (Belief-Desire-Intention) agents. Based on the conversation, produce a complete agent spec.
 
-Map the user's requirements to the exact schema fields. Infer reasonable defaults for:
-- max_iterations: 50 (unless user specifies)
-- max_duration: 30m (unless user specifies)
-- checkpoint_every: 5
-- escalation: always have a review_queue for ambiguous cases
+Map the user's requirements to the exact schema fields. Key principles:
+- Goals should be concrete and measurable (not "keep vault clean" but "broken_link_count must be 0")
+- Belief schema should list the specific state fields the agent tracks
+- Constraints should prevent destructive or unsafe behavior
+- Schedule should match the domain — vault maintenance needs hours, not seconds
+- Allowed tools should be minimal — only what the agent actually needs
+- Forbidden tools should always include "clarify" (agents decide, they don't ask)
 
-Ensure all generated strings are concrete and actionable. No placeholders.`,
-    schema: agentSchema,
+Infer reasonable defaults:
+- Schedule: every 6h for maintenance, every 1h for monitoring
+- State path: ~/.cache/hermes/agents/{name}/bdi-state.json
+- Model: anthropic/claude-sonnet-4 (if user has no preference)`,
+    schema: bdiAgentSchema,
     messages,
   });
 
-  // Build the full AgentState
-  const agentState: AgentState = {
-    name: object.name,
+  // Build the full BDIAgent
+  const agent: Omit<BDIAgent, 'name'> = {
     type: object.type,
     soul: {
-      persona: object.soulPersona,
-      voice: object.soulVoice,
-      communication: object.soulCommunication,
+      persona: object.personality,
+      voice: object.voice,
     },
-    corpus: {
-      path: object.corpusPath,
-      type: object.corpusType,
-      conventions: object.corpusConventions,
+    desires: {
+      goals: object.goals,
+      ...(object.priority ? { priority: object.priority } : {}),
+      ...(object.successCriteria ? { successCriteria: object.successCriteria } : {}),
     },
-    actions: {
-      allowed: object.actionsAllowed,
-      forbidden: object.actionsForbidden,
+    intentions: {
+      constraints: object.constraints,
+      ...(object.planningStrategy ? { planningStrategy: object.planningStrategy } : {}),
     },
-    quality: {
-      metrics: object.qualityMetrics,
+    beliefs: {
+      schema: object.beliefSchema,
+      statePath: object.statePath,
     },
-    stopping: {
-      condition: object.stoppingCondition,
-      max_iterations: object.maxIterations,
-      max_duration: object.maxDuration,
-      checkpoint_every: object.checkpointEvery,
+    tools: {
+      allowed: object.toolsAllowed,
+      forbidden: object.toolsForbidden,
     },
-    escalation: {
-      rules: object.escalationRules,
-    },
-    checkpoint: {
-      path: `~/Library/Caches/hermes/agents/${object.name}/state.json`,
-      contains: ['iteration', 'corpus_snapshot_hash', 'pending_actions', 'review_queue'],
+    heartbeat: {
+      schedule: object.schedule,
+      ...(object.model ? { model: object.model } : {}),
+      ...(object.profile ? { profile: object.profile } : {}),
     },
   };
 
-  return agentState;
+  return agent;
 }
 
-export async function saveAgent(name: string, agentState: AgentState) {
-  const agentDir = await createAgentScaffold(name, agentState);
+export async function saveAgent(name: string, agent: Omit<BDIAgent, 'name'>) {
+  const agentDir = await createAgentScaffold(name, agent);
   return { success: true, path: agentDir };
 }
