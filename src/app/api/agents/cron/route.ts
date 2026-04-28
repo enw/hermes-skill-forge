@@ -61,15 +61,14 @@ export async function POST(request: NextRequest) {
         await fs.writeFile(promptFile, prompt);
 
         // Build the hermes cron create command
-        // `hermes cron create SCHEDULE [PROMPT] --name NAME`
-        // prompt is positional, not a flag
+        // hermes cron create SCHEDULE [PROMPT] --name NAME
         const schedule = agent.heartbeat.schedule;
         const profile = agent.heartbeat.profile;
         const profilePrefix = profile && profile !== 'default' ? `hermes --profile "${profile}"` : 'hermes';
-        
+
         let cmd = `${profilePrefix} cron create "${schedule}" --name "${jobName}"`;
         
-        // Prompt as positional arg (quoted, from file)
+        // Prompt is positional
         cmd += ` "$(cat ${promptFile})"`;
 
         const result = safeExec(cmd);
