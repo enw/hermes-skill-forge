@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadAgent, loadBDIState, saveBDIState, initializeBDIState, BDIState } from '@/lib/agent-state';
+import { loadAgent, loadBDIState, saveBDIState, BDIState } from '@/lib/agent-state';
 import { generateBDIPrompt, extractToolsets } from '@/lib/cron-prompt-template';
 import { execFileSync } from 'child_process';
 import * as fs from 'fs/promises';
@@ -56,7 +56,15 @@ export async function POST(request: NextRequest) {
         const statePath = agent.beliefs.statePath.replace('~', hermesHome());
         const stateExists = await fs.access(statePath).then(() => true).catch(() => false);
         if (!stateExists) {
-          await initializeBDIState(agentName);
+          const initialState: BDIState = {
+            beliefs: { worldState: {}, lastObserved: new Date().toISOString(), observations: [] },
+            intentions: { activePlan: '', nextActions: [], progress: '' },
+            tickCount: 0,
+            goalsMet: false,
+            lastTickResult: null,
+            lastCronRunId: null,
+          };
+          await saveBDIState(agentName, initialState);
         }
 
         const schedule = agent.heartbeat.schedule;
@@ -99,7 +107,15 @@ export async function POST(request: NextRequest) {
       case 'reset': {
         // Clear BDI state but keep the cron job
         try {
-          await initializeBDIState(agentName);
+          const initialState: BDIState = {
+            beliefs: { worldState: {}, lastObserved: new Date().toISOString(), observations: [] },
+            intentions: { activePlan: '', nextActions: [], progress: '' },
+            tickCount: 0,
+            goalsMet: false,
+            lastTickResult: null,
+            lastCronRunId: null,
+          };
+          await saveBDIState(agentName, initialState);
           return NextResponse.json({ success: true, message: `Agent '${agentName}' state reset` });
         } catch (err: any) {
           return NextResponse.json({ success: false, message: `Failed to reset: ` + String(err) }, { status: 500 });
