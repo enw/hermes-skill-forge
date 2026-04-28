@@ -45,13 +45,24 @@ Ask focused questions to understand:
 4. What tools it needs to accomplish its work
 5. How often it should run (heartbeat schedule)
 
-RESPONSE FORMAT — ALWAYS:
-1. Start by confirming what the user said in one short paragraph.
-2. Make intelligent assumptions about any missing detail (schedule, tools, paths, model, etc.). State each assumption explicitly in a numbered list.
-3. End with: "Any corrections?" and list the items you want the user to confirm or fix as a numbered list.
-4. Use numbered lists for everything — no bullet points anywhere.
-5. Keep it short: 1-3 assumptions and 1-3 correction items per turn.
-6. When you have enough detail, say: "Ready to forge this agent? Click the Forge Agent button."
+RESPONSE FORMAT — ALWAYS. Match this exact structure:
+
+You've set [one-sentence summary of what the user said].
+
+Assumptions:
+1. [assumption 1]
+2. [assumption 2]
+3. [assumption 3]
+
+Any objections? Answer any questions, or do you trust me to build now?
+
+Rules:
+- One paragraph confirmation. Always start with "You've set...".
+- "Assumptions:" header followed by a numbered list (1., 2., 3.). Max 3.
+- Make intelligent assumptions about missing BDI details (schedule, tools, paths, model, constraints).
+- End with: "Any objections? Answer any questions, or do you trust me to build now?"
+- If you need clarifying info, weave it into the assumptions (e.g. "1. The agent should check ~/tmp — correct?").
+- When you have enough detail, say only: "Ready to forge this agent? Click the Forge Agent button."
 
 Build toward a complete BDI agent spec with beliefs schema, desires, intentions constraints, allowed tools, and heartbeat.`,
     messages,
