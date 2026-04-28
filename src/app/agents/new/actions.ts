@@ -11,17 +11,17 @@ const bdiAgentSchema = z.object({
   personality: z.string().describe("The agent's persona — a short descriptive phrase"),
   voice: z.string().describe('How the agent communicates — e.g., quiet, systematic, no-nonsense'),
   goals: z.array(z.string()).describe('Concrete goals with measurable targets, e.g., "broken_link_count must be 0"'),
-  priority: z.string().optional().describe('Overall priority or guiding principle'),
-  successCriteria: z.string().optional().describe('When the agent should consider itself done'),
+  priority: z.string().describe('Overall priority or guiding principle. Use "none" if not applicable.'),
+  successCriteria: z.string().describe('When the agent should consider itself done. Use "none" if ongoing.'),
   constraints: z.array(z.string()).describe('Behavioral constraints — what the agent must respect while acting'),
-  planningStrategy: z.string().optional().describe('How the agent should prioritize its work'),
+  planningStrategy: z.string().describe('How the agent should prioritize its work. Use "none" if not applicable.'),
   beliefSchema: z.array(z.string()).describe('State fields to track, e.g., "total_notes: number", "broken_links: number"'),
   statePath: z.string().describe('Path to persist BDI state, e.g., ~/.cache/hermes/agents/vault-gardener/bdi-state.json'),
   toolsAllowed: z.array(z.string()).describe('Tool names the agent may use: terminal, file, search_files, read_file, write_file, patch, web_search, web_extract'),
   toolsForbidden: z.array(z.string()).describe('Tool names the agent must NOT use: clarify, delegate_task'),
   schedule: z.string().describe('Cron schedule, e.g., "every 6h", "0 9 * * *"'),
-  model: z.string().optional().describe('Model to use, e.g., "anthropic/claude-sonnet-4"'),
-  profile: z.string().optional().describe('Hermes profile to run under, e.g., "default", "work", "research"'),
+  model: z.string().describe('Model to use. Use "default" if no preference.'),
+  profile: z.string().describe('Hermes profile to run under. Use "default" if not specified.'),
 });
 
 function checkApiKey() {
@@ -101,12 +101,12 @@ Infer reasonable defaults:
     },
     desires: {
       goals: object.goals,
-      ...(object.priority ? { priority: object.priority } : {}),
-      ...(object.successCriteria ? { successCriteria: object.successCriteria } : {}),
+      ...(object.priority !== 'none' ? { priority: object.priority } : {}),
+      ...(object.successCriteria !== 'none' ? { successCriteria: object.successCriteria } : {}),
     },
     intentions: {
       constraints: object.constraints,
-      ...(object.planningStrategy ? { planningStrategy: object.planningStrategy } : {}),
+      ...(object.planningStrategy !== 'none' ? { planningStrategy: object.planningStrategy } : {}),
     },
     beliefs: {
       schema: object.beliefSchema,
@@ -118,8 +118,8 @@ Infer reasonable defaults:
     },
     heartbeat: {
       schedule: object.schedule,
-      ...(object.model ? { model: object.model } : {}),
-      ...(object.profile ? { profile: object.profile } : {}),
+      ...(object.model !== 'default' ? { model: object.model } : {}),
+      ...(object.profile !== 'default' ? { profile: object.profile } : {}),
     },
   };
 
