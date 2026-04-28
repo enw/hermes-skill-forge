@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadAgent, loadBDIState, saveBDIState, BDIState } from '@/lib/agent-state';
-import { generateBDIPrompt, extractToolsets } from '@/lib/cron-prompt-template';
 import { execFileSync } from 'child_process';
 import * as fs from 'fs/promises';
 
@@ -19,6 +18,99 @@ function safeExec(file: string, args: string[]): { success: boolean; output: str
 
 function hermesBinary(): string {
   return 'hermes';
+}
+
+// Generate BDI prompt from agent and previous state
+function generateBDIPrompt(agent: any, prevState: BDIState | null): string {
+  const prevStateBlock = prevState ? `\n### PREVIOUS STATE (from last tick)\n${JSON.stringify(prevState, null, 2)}` : '';
+  
+  return `# BDIAgent: ${agent.name}
+
+You are ${agent.soul.persona}. Your voice: ${agent.soul.voice}.
+
+## DESIRES (your goals)
+${agent.desires.goals.map(g => `- ${g}`).join('\n')}
+${agent.desires.priority ? `\nPriority: ${agent.desires.priority}` : ''}
+${agent.desires.successCriteria ? `\nSuccess when: ${agent.desires.successCriteria}` : ''}
+
+## INTENTIONS CONSTRAINTS
+${agent.intentions.constraints.map(c => `- ${c}`).join('\n')}
+${agent.intentions.planningStrategy ? `\nStrategy: ${agent.intentions.planningStrategy}` : ''}
+
+## ALLOWED TOOLS
+${agent.tools.allowed.join(', ')}
+
+## FORBIDDEN
+${agent.tools.forbidden.join(', ')}
+
+## BELIEFS SCHEMA
+Track the following state fields:
+${agent.beliefs.schema.map(s => `- ${s}`).join('\n')}
+
+${prevStateBlock}
+
+---
+
+## INSTRUCTIONS
+
+Execute one BDI cycle:
+
+### 1. PERCEIVE — Update your beliefs
+Use available tools to scan the current state of your domain. Update the worldState with real observations.
+
+### 2. DELIBERATE — Compare beliefs vs desires
+- Are any goals met?
+- Is there a gap between current beliefs and desired state?
+- Should you change your active plan based on what you see?
+
+### 3. ACT — Execute on your intentions
+Take 1-3 concrete actions using your allowed tools. Do not ask questions — decide and act.
+Respect all intention constraints and forbidden actions.
+
+### 4. PERSIST — Save your updated BDI state
+Write a JSON file to ${agent.beliefs.statePath} with this exact structure:
+{
+  "beliefs": {
+    "worldState": { ... },
+    "lastObserved": "<ISO timestamp>",
+    "observations": ["what you observed this tick"]
+  },
+  "intentions": {
+    "activePlan": "what you're working on next",
+    "nextActions": ["1-3 specific next actions"],
+    "progress": "quantified progress toward goals"
+  },
+  "tickCount": ${prevState ? prevState.tickCount + 1 : 1},
+  "goalsMet": true/false,
+  "lastTickResult": "brief summary of what happened this tick"
+}
+
+### 5. REPORT
+In your final response, print a 2-3 line summary: what you observed, what you did, and goal progress.`;
+}
+
+// Map agent tool names to Hermes toolset names
+const TOOLSET_MAP: Record<string, string> = {
+  'terminal': 'terminal',
+  'file': 'file', 
+  'search_files': 'file',
+  'read_file': 'file',
+  'write_file': 'file',
+  'patch': 'file',
+  'web_search': 'web',
+  'web_extract': 'web',
+  'browser_navigate': 'browser',
+  'browser_click': 'browser',
+  'delegate_task': 'delegation',
+};
+
+function extractToolsets(allowedTools: string[]): string[] {
+  const toolsets = new Set<string>();
+  for (const tool of allowedTools) {
+    const ts = TOOLSET_MAP[tool];
+    if (ts) toolsets.add(ts);
+  }
+  return Array.from(toolsets);
 }
 
 export async function POST(request: NextRequest) {
