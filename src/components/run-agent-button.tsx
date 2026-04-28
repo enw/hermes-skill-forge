@@ -4,24 +4,30 @@ import { useState } from 'react';
 
 type CronAction = 'deploy' | 'run' | 'stop' | 'reset';
 
-export function RunAgentButton({ agentName }: { agentName: string }) {
+const KNOWN_PROFILES = ['default', 'local', 'tbai'];
+
+export function RunAgentButton({ agentName, agentProfile }: { agentName: string; agentProfile?: string }) {
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<CronAction | null>(null);
   const [result, setResult] = useState<{ message: string; success: boolean } | null>(null);
+  const [deployProfile, setDeployProfile] = useState(agentProfile || 'default');
 
-  const runAction = async (action: CronAction) => {
+  const runAction = async (action: CronAction, profile?: string) => {
     setLoading(true);
     setActiveAction(action);
     setResult(null);
     try {
+      const body: Record<string, string> = { agentName, action };
+      if (action === 'deploy' && profile) {
+        body.profile = profile;
+      }
       const res = await fetch('/api/agents/cron', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentName, action }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       setResult({ message: data.message, success: data.success });
-      // Refresh page to show updated state
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       setResult({ message: `Error: ${String(err)}`, success: false });
@@ -47,8 +53,22 @@ export function RunAgentButton({ agentName }: { agentName: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 flex-wrap">
-        <button onClick={() => runAction('deploy')} disabled={loading} className={btnClass('success')}>
+      <div className="flex gap-2 flex-wrap items-center">
+        <select
+          value={deployProfile}
+          onChange={(e) => setDeployProfile(e.target.value)}
+          className="inline-flex rounded-md border border-input bg-background px-3 py-1.5 text-sm h-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          disabled={loading && activeAction === 'deploy'}
+        >
+          {KNOWN_PROFILES.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+          {!KNOWN_PROFILES.includes(deployProfile) && (
+            <option value={deployProfile}>{deployProfile}</option>
+          )}
+        </select>
+
+        <button onClick={() => runAction('deploy', deployProfile)} disabled={loading} className={btnClass('success')}>
           {loading && activeAction === 'deploy' ? 'Deploying...' : 'Deploy'}
         </button>
         <button onClick={() => runAction('run')} disabled={loading} className={btnClass('primary')}>

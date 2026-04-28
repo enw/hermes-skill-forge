@@ -78,7 +78,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ name: st
 
       {/* Control Bar */}
       <div className="rounded-lg border bg-card p-4">
-        <RunAgentButton agentName={agent.name} />
+        <RunAgentButton agentName={agent.name} agentProfile={agent.heartbeat?.profile} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

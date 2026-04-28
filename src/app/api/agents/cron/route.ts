@@ -1,27 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadAgent, loadBDIState, saveBDIState, initializeBDIState, BDIState } from '@/lib/agent-state';
 import { generateBDIPrompt, extractToolsets } from '@/lib/cron-prompt-template';
-import { execSync } from 'child_process';
-import * as path from 'path';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs/promises';
 
 function hermesHome(): string {
   return process.env.HOME || '/root';
 }
 
-function safeExec(cmd: string): { success: boolean; output: string } {
+function safeExec(file: string, args: string[]): { success: boolean; output: string } {
   try {
-    const output = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+    const output = execFileSync(file, args, { encoding: 'utf-8', timeout: 30000 });
     return { success: true, output: output.trim() };
   } catch (err: any) {
     return { success: false, output: err.stdout || err.stderr || String(err) };
   }
 }
 
+function hermesBinary(): string {
+  return 'hermes';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { agentName, action } = body;
+    const { agentName, action, profile } = body;
 
     if (!agentName || !action) {
       return NextResponse.json({ success: false, message: 'agentName and action required' }, { status: 400 });
@@ -56,22 +59,17 @@ export async function POST(request: NextRequest) {
           await initializeBDIState(agentName);
         }
 
-        // Write prompt to temp file for cronjob create
-        const promptFile = `/tmp/bdi-prompt-${agentName}.txt`;
-        await fs.writeFile(promptFile, prompt);
-
-        // Build the hermes cron create command
-        // hermes cron create SCHEDULE [PROMPT] --name NAME
         const schedule = agent.heartbeat.schedule;
-        const profile = agent.heartbeat.profile;
-        const profilePrefix = profile && profile !== 'default' ? `hermes --profile "${profile}"` : 'hermes';
+        const deployProfile = profile || agent.heartbeat?.profile;
 
-        let cmd = `${profilePrefix} cron create "${schedule}" --name "${jobName}"`;
-        
-        // Prompt is positional
-        cmd += ` "$(cat ${promptFile})"`;
+        // Build args: hermes [--profile P] cron create SCHEDULE PROMPT --name NAME
+        const args: string[] = [];
+        if (deployProfile && deployProfile !== 'default') {
+          args.push('--profile', deployProfile);
+        }
+        args.push('cron', 'create', schedule, prompt, '--name', jobName);
 
-        const result = safeExec(cmd);
+        const result = safeExec(hermesBinary(), args);
         if (!result.success) {
           return NextResponse.json({ success: false, message: `Failed to create cron job: ${result.output}` }, { status: 500 });
         }
@@ -83,7 +81,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'run': {
-        const result = safeExec(`hermes cron run "${jobName}"`);
+        const result = safeExec(hermesBinary(), ['cron', 'run', jobName]);
         if (!result.success) {
           return NextResponse.json({ success: false, message: `Failed to trigger: ${result.output}` }, { status: 500 });
         }
@@ -91,7 +89,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'stop': {
-        const result = safeExec(`hermes cron remove "${jobName}"`);
+        const result = safeExec(hermesBinary(), ['cron', 'remove', jobName]);
         if (!result.success) {
           return NextResponse.json({ success: false, message: `Failed to remove: ${result.output}` }, { status: 500 });
         }
@@ -104,7 +102,7 @@ export async function POST(request: NextRequest) {
           await initializeBDIState(agentName);
           return NextResponse.json({ success: true, message: `Agent '${agentName}' state reset` });
         } catch (err: any) {
-          return NextResponse.json({ success: false, message: `Failed to reset: ${String(err)}` }, { status: 500 });
+          return NextResponse.json({ success: false, message: `Failed to reset: ` + String(err) }, { status: 500 });
         }
       }
 
@@ -124,13 +122,13 @@ export async function GET(request: NextRequest) {
     if (agentName) {
       // Check if this specific agent has a cron job
       const jobName = `agent-${agentName}`;
-      const result = safeExec(`hermes cron list 2>&1`);
+      const result = safeExec(hermesBinary(), ['cron', 'list']);
       const isActive = result.success && result.output.includes(jobName);
       return NextResponse.json({ success: true, agent: agentName, isDeployed: isActive });
     }
 
     // List all agent cron jobs
-    const result = safeExec(`hermes cron list 2>&1`);
+    const result = safeExec(hermesBinary(), ['cron', 'list']);
     return NextResponse.json({ success: true, output: result.output });
   } catch (err: any) {
     return NextResponse.json({ success: false, message: String(err) }, { status: 500 });
