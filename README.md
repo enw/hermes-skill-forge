@@ -1,114 +1,132 @@
-# Hermes Skill Forge
+# BDI Agent Forge
 
-A collection of custom skills and automation patterns for the Hermes Agent platform. This repository contains specialized skills that extend Hermes' capabilities for specific workflows.
+IDE for authoring, deploying, and monitoring BDI-based AI agents that run as automated cron jobs.
+
+Transform agent definitions (AGENT.md with beliefs/schema, desires/goals, intentions/constraints) into persistent, self-executing AI agents.
+
+## What is BDI?
+
+Belief-Desire-Intention (BDI) is a cognitive architecture for autonomous agents:
+
+- **Beliefs**: What the agent knows about the world (schema, observations, state)
+- **Desires**: What the agent wants to achieve (goals, priorities, success criteria)
+- **Intentions**: What the agent plans to do (constraints, active plans, next actions)
 
 ## Features
 
-- **Custom Agent Skills**: Pre-built skills for common automation tasks
-- **Cron Job Management**: Automated task scheduling with profile support
-- **Vault Integration**: Seamless Obsidian vault integration for note management
-- **Profile Isolation**: Multiple isolated Hermes instances (default, local, tbai)
-- **CI/CD Ready**: Automated workflows for deployment and maintenance
+- **Agent Authoring**: Write agents in AGENT.md with BDI schema
+- **Cron Integration**: Automatically deploy to Hermes cron job scheduler
+- **State Persistence**: Track BDI state across execution cycles
+- **IDE Interface**: Web-based dashboard for monitoring agent status
+- **Tool Management**: Configure allowed/forbidden tool sets per agent
 
 ## Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/enw/hermes-skill-forge.git
-
-# Install dependencies
-cd hermes-skill-forge
+# Clone and install
+git clone https://github.com/edub8828/insight-extractor.git
+cd insight-extractor
 pnpm install
 
-# Run the Hermes agent
-hermes chat "Your task here"
-
-# Or use one-shot mode
-hermes -z "Your task here"
+# Start the development server
+pnpm dev
 ```
 
-## Cron Jobs
+## Agent Definition Format
 
-Cron jobs are scheduled tasks that run automatically based on their schedules.
+Create an AGENT.md file in your agents directory:
 
-### Available Profiles
-
-- **default**: General-purpose tasks (AI strategy, flight monitoring, etc.)
-- **local**: Development and testing tasks
-- **tbai**: TB-specific AI tasks
-
-### Managing Cron Jobs
-
-```bash
-# List all cron jobs
-hermes cron list
-
-# Create a new cron job
-hermes cron create "0 9 * * *" "Your prompt here" --name "job-name"
-
-# Run a cron job immediately
-hermes cron run "job-name"
-
-# Stop a cron job
-hermes cron remove "job-name"
+```markdown
+---
+name: insight-extractor
+type: content-extraction
+soul:
+  persona: You are a content extraction specialist
+  voice: professional, precise, thorough
+desires:
+  goals:
+    - Extract insights from LinkedIn posts
+    - Organize insights into vault
+  priority: medium
+  successCriteria: All posts processed and insights extracted
+intentions:
+  constraints:
+    - Only use allowed tools
+    - Respect rate limits
+  planningStrategy: sequential processing
+beliefs:
+  schema:
+    - worldState
+    - lastObserved
+    - observations
+  statePath: ~/.hermes/agents/insight-extractor/state.json
+tools:
+  allowed:
+    - web_search
+    - web_extract
+    - browser_navigate
+  forbidden:
+    - delegate_task
+heartbeat:
+  schedule: every 6h
+  model: anthropic/claude-sonnet-4
+---
 ```
 
-## Skills
+## Architecture
 
-Skills are reusable automation patterns that can be attached to cron jobs or run directly.
+Agent Forge is a Next.js IDE that:
 
-```bash
-# List available skills
-hermes skills list
+1. **Authors** BDI agent definitions via AGENT.md format
+2. **Deploys** agents as Hermes cron jobs via API calls
+3. **Monitors** agent BDI state by reading persisted JSON state files
+4. **Controls** agents (start/stop/run-now) through the dashboard
 
-# View a specific skill
-hermes skills view <skill-name>
+The Next.js app NEVER executes agents itself. Agents run ONLY via Hermes cron jobs. The app is purely an authoring IDE and monitoring dashboard.
 
-# Run a skill directly
-hermes -s <skill-name> -z "Task description"
+## Tech Stack
+
+- Next.js 16 (Turbopack)
+- TypeScript
+- Tailwind v4
+- gray-matter (YAML frontmatter parsing)
+- zod (schema validation)
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── agents/          # Agent management pages
+│   ├── build/           # Build mode
+│   ├── forge/           # Agent authoring
+│   ├── analytics/       # Monitoring dashboard
+│   └── api/agents/cron/ # Cron job management API
+├── lib/
+│   ├── agent-state.ts   # BDI types and loaders
+│   └── cron-prompt-template.ts # Prompt generation
+└── components/          # UI components
 ```
 
-## Profiles
+## Monitoring Dashboard
 
-Hermes supports multiple isolated profiles, each with their own configuration and credentials.
-
-```bash
-# List profiles
-hermes profile list
-
-# View profile configuration
-hermes config
-
-# Edit profile configuration
-hermes config edit
-```
-
-## Gateway
-
-The Hermes gateway manages message delivery and webhook subscriptions.
-
-```bash
-# Install gateway as system service
-sudo hermes gateway install --system
-
-# Start gateway
-hermes gateway run
-
-# List webhook subscriptions
-hermes webhook list
-```
-
-## License
-
-MIT License - See LICENSE file for details.
+Access `/analytics` to view:
+- All deployed agents
+- BDI state history
+- Last execution results
+- Agent status indicators
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
+3. Add new agent types or tools
+4. Commit your changes
 5. Open a Pull Request
+
+## License
+
+MIT License - See LICENSE file for details.
 
 ## Support
 
