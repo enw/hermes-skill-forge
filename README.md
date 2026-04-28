@@ -1,108 +1,115 @@
 # Hermes Skill Forge
 
-A local-first web studio for browsing, authoring, and validating [Hermes Agent](https://github.com/NousResearch/hermes-agent) skills. No cloud. No database. Just your filesystem, rendered beautifully.
+A collection of custom skills and automation patterns for the Hermes Agent platform. This repository contains specialized skills that extend Hermes' capabilities for specific workflows.
 
-![Skill Forge Directory](docs/screenshot.png)
+## Features
 
----
-
-## The Problem
-
-Hermes skills are powerful. They let agents learn from experience, encode workflows, and share knowledge. But right now they are just markdown files scattered across `~/.hermes/skills/`. There is no central registry, no validator, and no guided authoring flow. Writing a skill means memorizing frontmatter schemas and hoping your markdown parses correctly.
-
-Skill Forge fixes that.
-
-## What It Does
-
-Skill Forge reads your local Hermes skills directory and turns it into a searchable, filterable, editable studio.
-
-### Browse
-- Search and filter skills by name, description, category, or tags
-- See required commands, environment variables, and toolsets at a glance
-- Navigate nested categories (`software-development/`, `productivity/`, `mlops/`)
-
-### Inspect
-- View parsed frontmatter with badge display
-- Read body content with syntax highlighting
-- Run validation to catch missing fields, short bodies, unwrapped commands, and missing env references
-
-### Build
-- Guided form-based skill builder with live markdown preview
-- Auto-generates valid frontmatter
-- Writes directly to `~/.hermes/skills/` via server actions
-- Validation gates prevent broken skills from reaching your filesystem
-
-## Tech Stack
-
-- Next.js 16 (App Router)
-- TypeScript
-- Tailwind CSS + shadcn/ui
-- gray-matter (frontmatter parsing)
+- **Custom Agent Skills**: Pre-built skills for common automation tasks
+- **Cron Job Management**: Automated task scheduling with profile support
+- **Vault Integration**: Seamless Obsidian vault integration for note management
+- **Profile Isolation**: Multiple isolated Hermes instances (default, local, tbai)
+- **CI/CD Ready**: Automated workflows for deployment and maintenance
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/hermes-skill-forge.git
+# Clone the repository
+git clone https://github.com/enw/hermes-skill-forge.git
+
+# Install dependencies
 cd hermes-skill-forge
 pnpm install
-pnpm dev
+
+# Run the Hermes agent
+hermes chat "Your task here"
+
+# Or use one-shot mode
+hermes -z "Your task here"
 ```
 
-Open http://localhost:3000. It will automatically scan `~/.hermes/skills/` and display your skill directory.
+## Cron Jobs
 
-Override the skills path:
+Cron jobs are scheduled tasks that run automatically based on their schedules.
+
+### Available Profiles
+
+- **default**: General-purpose tasks (AI strategy, flight monitoring, etc.)
+- **local**: Development and testing tasks
+- **tbai**: TB-specific AI tasks
+
+### Managing Cron Jobs
 
 ```bash
-SKILLS_DIR=/custom/path/to/skills pnpm dev
+# List all cron jobs
+hermes cron list
+
+# Create a new cron job
+hermes cron create "0 9 * * *" "Your prompt here" --name "job-name"
+
+# Run a cron job immediately
+hermes cron run "job-name"
+
+# Stop a cron job
+hermes cron remove "job-name"
 ```
 
-## Architecture
+## Skills
 
-Skill Forge is local-first. It does not call APIs or run a database. It reads markdown from disk, parses it server-side with Node.js `fs`, and renders it in the browser.
+Skills are reusable automation patterns that can be attached to cron jobs or run directly.
 
+```bash
+# List available skills
+hermes skills list
+
+# View a specific skill
+hermes skills view <skill-name>
+
+# Run a skill directly
+hermes -s <skill-name> -z "Task description"
 ```
-~/.hermes/skills/
-├── software-development/
-│   └── hermes-dashboard-setup/
-│       └── SKILL.md
-├── productivity/
-│   └── cto-advisor/
-│       └── SKILL.md
-└── ...
+
+## Profiles
+
+Hermes supports multiple isolated profiles, each with their own configuration and credentials.
+
+```bash
+# List profiles
+hermes profile list
+
+# View profile configuration
+hermes config
+
+# Edit profile configuration
+hermes config edit
 ```
 
-The parser extracts YAML frontmatter and markdown body, validates schema compliance, and surfaces issues inline. The builder reverses the process: form input -> frontmatter + body -> valid SKILL.md written to disk.
+## Gateway
 
-## Pages
+The Hermes gateway manages message delivery and webhook subscriptions.
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Skill directory with search and tag filtering |
-| `/skill/[id]` | Skill detail with validation report, body preview, and linked file editor |
-| `/build` | Guided skill builder with live preview and save-to-disk |
-| `/analytics` | Usage insights parsed from sessions, logs, and dashboard activity |
+```bash
+# Install gateway as system service
+sudo hermes gateway install --system
 
-## Roadmap
+# Start gateway
+hermes gateway run
 
-- [x] Linked file editing (references/, templates/, scripts/, assets/)
-- [x] Dark mode toggle
-- [x] Sorting and advanced filtering
-- [x] Skill usage analytics
-- [x] LLM-powered Skill Forge Wizard — conversational interview + generation
-- [ ] Git diff / version history per skill (leverage git log)
-- [ ] Import skill from GitHub URL or raw markdown
-- [ ] Skill dependency graph — visualize cross-references and shared tools
-- [ ] Auto-fix panel — one-click repairs for validation issues
-- [ ] Template library — start from boilerplates (CLI wrapper, API integration, Obsidian workflow)
-- [ ] Dry-run test harness — simulate how Hermes loads and executes a skill
-- [ ] GitHub PR submission flow for community skill sharing
-
-## Contributing
-
-Hermes Skill Forge is built for the Hermes community. If you use Hermes, you write skills. This tool makes that process faster and less error-prone.
-
-Open an issue or PR. The codebase is intentionally small and readable.
+# List webhook subscriptions
+hermes webhook list
+```
 
 ## License
 
-MIT
+MIT License - See LICENSE file for details.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## Support
+
+For issues and questions, please open an issue on the GitHub repository.
