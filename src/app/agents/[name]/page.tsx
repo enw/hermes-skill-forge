@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { RunAgentButton } from '@/components/run-agent-button';
 import type { BDIAgent, BDIState } from '@/lib/agent-state';
+import { AgentEditor } from '@/components/agent-editor';
 
 async function safeJson<T>(response: Response, fallback: T): Promise<T> {
   if (!response.ok) return fallback;
@@ -47,6 +47,57 @@ export default function AgentDetailPage({ params }: { params: Promise<{ name: st
     load();
   }, [params]);
 
+  const handleDeploy = async () => {
+    if (!agent) return;
+    try {
+      const response = await fetch(`/api/agents/cron`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentName: agent.name, action: 'deploy' })
+      });
+      if (response.ok) {
+        setIsDeployed(true);
+      }
+    } catch (error) {
+      console.error('Deploy error:', error);
+    }
+  };
+
+  const handleRun = async () => {
+    if (!agent) return;
+    try {
+      const response = await fetch(`/api/agents/cron`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentName: agent.name, action: 'run' })
+      });
+      if (response.ok) {
+        // Optionally refresh state
+        const stateRes = await fetch(`/api/agents/state?agent=${agent.name}`);
+        const stateData = await safeJson(stateRes, { state: null });
+        setState(stateData.state);
+      }
+    } catch (error) {
+      console.error('Run error:', error);
+    }
+  };
+
+  const handleStop = async () => {
+    if (!agent) return;
+    try {
+      const response = await fetch(`/api/agents/cron`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentName: agent.name, action: 'stop' })
+      });
+      if (response.ok) {
+        setIsDeployed(false);
+      }
+    } catch (error) {
+      console.error('Stop error:', error);
+    }
+  };
+
   if (loading) {
     return <div className="py-12 text-center text-muted-foreground">Loading agent...</div>;
   }
@@ -62,7 +113,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ name: st
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center gap-4">
         <Link href="/agents" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" />
@@ -76,94 +127,20 @@ export default function AgentDetailPage({ params }: { params: Promise<{ name: st
         </span>
       </div>
 
-      {/* Control Bar */}
-      <div className="rounded-lg border bg-card p-4">
-        <RunAgentButton agentName={agent.name} agentProfile={agent.heartbeat?.profile} />
-      </div>
+      <AgentEditor
+        agentName={agent.name}
+        agentData={agent}
+        isDeployed={isDeployed}
+        onDeploy={handleDeploy}
+        onRun={handleRun}
+        onStop={handleStop}
+      />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Desires */}
-        {agent.desires && (
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-lg font-semibold mb-4">Desires (Goals)</h2>
-            <ul className="space-y-2">
-              {agent.desires.goals.map((g, i) => (
-                <li key={i} className="text-sm text-muted-foreground">&bull; {g}</li>
-              ))}
-            </ul>
-            {agent.desires.priority && (
-              <p className="mt-3 text-sm text-muted-foreground"><span className="font-medium">Priority:</span> {agent.desires.priority}</p>
-            )}
-            {agent.desires.successCriteria && (
-              <p className="mt-2 text-sm text-muted-foreground"><span className="font-medium">Success:</span> {agent.desires.successCriteria}</p>
-            )}
-          </div>
-        )}
-
-        {/* Intentions */}
-        {agent.intentions && (
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-lg font-semibold mb-4">Intentions (Constraints)</h2>
-            <ul className="space-y-2">
-              {agent.intentions.constraints.map((c, i) => (
-                <li key={i} className="text-sm text-muted-foreground">&bull; {c}</li>
-              ))}
-            </ul>
-            {agent.intentions.planningStrategy && (
-              <p className="mt-3 text-sm text-muted-foreground"><span className="font-medium">Strategy:</span> {agent.intentions.planningStrategy}</p>
-            )}
-          </div>
-        )}
-
-        {/* Beliefs */}
-        {agent.beliefs && (
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-lg font-semibold mb-4">Beliefs (State Schema)</h2>
-            <ul className="space-y-1">
-              {agent.beliefs.schema.map((s, i) => (
-                <li key={i} className="text-sm font-mono bg-muted px-2 py-1 rounded">{s}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Tools */}
-        {agent.tools && (
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-lg font-semibold mb-4">Tools</h2>
-            <div className="space-y-1">
-              <div className="text-sm text-muted-foreground">
-                <span className="font-medium">Allowed:</span>{' '}
-                {agent.tools.allowed.map(t => <code key={t} className="bg-muted px-1 py-0.5 rounded text-xs mr-1">{t}</code>)}
-              </div>
-              {agent.tools.forbidden.length > 0 && (
-                <div className="text-sm text-muted-foreground">
-                  <span className="font-medium">Forbidden:</span>{' '}
-                  {agent.tools.forbidden.map(t => <code key={t} className="bg-red-500/10 px-1 py-0.5 rounded text-xs text-red-400 mr-1">{t}</code>)}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Heartbeat */}
-      {agent.heartbeat && (
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="text-lg font-semibold mb-2">Heartbeat</h2>
-          <div className="text-sm text-muted-foreground">
-            <span className="font-medium">Schedule:</span> <code className="bg-muted px-1 py-0.5 rounded">{agent.heartbeat.schedule}</code>
-            {agent.heartbeat.model && <span className="ml-4"><span className="font-medium">Model:</span> {agent.heartbeat.model}</span>}
-            {agent.heartbeat.profile && <span className="ml-4"><span className="font-medium">Profile:</span> {agent.heartbeat.profile}</span>}
-          </div>
-        </div>
-      )}
-
-      {/* Live State */}
+      {/* State Display (read-only) */}
       {state && (
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="text-lg font-semibold mb-2">Live State</h2>
-          <pre className="bg-muted p-4 rounded-md text-xs overflow-auto max-h-64">
+        <div className="rounded-lg border bg-card p-4">
+          <h2 className="text-sm font-semibold mb-2">Live State</h2>
+          <pre className="bg-muted p-3 rounded-md text-xs overflow-auto max-h-48">
             {JSON.stringify(state, null, 2)}
           </pre>
         </div>
