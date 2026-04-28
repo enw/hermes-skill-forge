@@ -191,15 +191,20 @@ export default function NewAgentPage() {
             )}
           </div>
 
-          <div className="border-t p-4 flex gap-2">
-            <input
-              type="text"
+          <div className="border-t p-4 flex gap-2 items-end">
+            <textarea
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && send()}
-              placeholder="Describe your agent..."
-              className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              placeholder="Describe your agent... (Ctrl+Enter to send)"
+              className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
               disabled={loading}
+              rows={2}
             />
             <button
               onClick={send}
